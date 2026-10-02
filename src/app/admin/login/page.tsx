@@ -16,7 +16,7 @@ export default function AdminLoginPage() {
   useEffect(() => {
     let active = true;
     void getAdminSession()
-      .then(() => { if (active) router.replace('/admin/products'); })
+      .then(() => { if (active) window.location.replace('/admin/products'); })
       .catch((sessionError: unknown) => {
         if (!active || !(sessionError instanceof Error)) return;
         if (sessionError.message.includes('not configured')) {
@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
         }
       });
     return () => { active = false; };
-  }, [router]);
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
