@@ -498,8 +498,17 @@ if (process.env.NODE_ENV !== "production") {
   allowedOrigins.add("http://localhost:3001");
 }
 
+function isShopfrontVercelPreviewOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && /^shopfront-[a-z0-9]+-nawaz5\.vercel\.app$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
-  origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin) || isShopfrontVercelPreviewOrigin(origin)),
   credentials: true,
 }));
 app.use(express.json({ limit: "40mb" }));
