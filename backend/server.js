@@ -214,15 +214,44 @@ function hasSmtpConfig() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD && process.env.EMAIL_FROM);
 }
 
+function hasEmailConfig() {
+  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM) || hasSmtpConfig();
+}
+
 async function sendCustomerActionEmail({ user, subject, text, url }) {
-  if (!hasSmtpConfig()) {
+  if (!hasEmailConfig()) {
     if (process.env.NODE_ENV === "production") {
-      const error = new Error("Email delivery is not configured. Set the SMTP settings on the backend.");
+      const error = new Error("Email delivery is not configured. Set the email provider settings on the backend.");
       error.status = 503;
       throw error;
     }
     console.log(`Development-only ${subject} link for ${user.email}: ${url}`);
     return false;
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM,
+        to: [user.email],
+        subject,
+        text: `${text}\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) {
+      const error = new Error(`Email provider rejected the request (HTTP ${response.status}).`);
+      error.status = 502;
+      throw error;
+    }
+
+    return true;
   }
 
   const port = Number(process.env.SMTP_PORT);
@@ -569,7 +598,7 @@ app.post("/api/auth/register", requireFrontendOrigin, async (req, res) => {
   if (!signingSecret || signingSecret.length < 32) {
     return res.status(503).json({ message: "Customer sign-in is not configured on the server." });
   }
-  if (process.env.NODE_ENV === "production" && !hasSmtpConfig()) {
+  if (process.env.NODE_ENV === "production" && !hasEmailConfig()) {
     return res.status(503).json({ message: "Email delivery must be configured before customers can register." });
   }
 
@@ -684,7 +713,7 @@ app.post("/api/auth/verification/resend", requireFrontendOrigin, async (req, res
   const customer = users.find((user) => user.email === email && user.emailVerified !== true);
   const result = { message: "If an unverified account exists for that email, a verification link has been sent." };
   if (!customer) return res.json(result);
-  if (process.env.NODE_ENV === "production" && !hasSmtpConfig()) {
+  if (process.env.NODE_ENV === "production" && !hasEmailConfig()) {
     return res.status(503).json({ message: "Email delivery is not configured on the server." });
   }
 
@@ -704,7 +733,7 @@ app.post("/api/auth/verification/resend", requireFrontendOrigin, async (req, res
 });
 
 app.post("/api/auth/password/forgot", requireFrontendOrigin, async (req, res) => {
-  if (process.env.NODE_ENV === "production" && !hasSmtpConfig()) {
+  if (process.env.NODE_ENV === "production" && !hasEmailConfig()) {
     return res.status(503).json({ message: "Email delivery is not configured on the server." });
   }
   const email = String(req.body?.email || "").trim().toLowerCase();
