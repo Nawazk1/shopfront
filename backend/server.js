@@ -246,7 +246,15 @@ async function sendCustomerActionEmail({ user, subject, text, url }) {
     });
 
     if (!response.ok) {
-      const error = new Error(`Email provider rejected the request (HTTP ${response.status}).`);
+      const responseText = await response.text();
+      let providerMessage = responseText;
+      try {
+        const body = JSON.parse(responseText);
+        providerMessage = body.message || body.name || body.error || responseText;
+      } catch {
+        // Keep the provider's plain-text rejection readable in backend logs.
+      }
+      const error = new Error(`Email provider rejected the request (HTTP ${response.status}): ${providerMessage}`);
       error.status = 502;
       throw error;
     }
