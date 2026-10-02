@@ -926,8 +926,24 @@ app.delete("/api/admin/products/:id", requireFrontendOrigin, requireAdmin, (req,
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   const status = error.status || (error.type === "entity.too.large" ? 413 : 500);
+  console.error("API request failed:", {
+    method: req.method,
+    path: req.path,
+    status,
+    code: error.code,
+    command: error.command,
+    message: error.message,
+  });
+  let message = error.message;
+  if (status === 500 && req.path === "/api/auth/register") {
+    message = "We couldn't send the verification email. Check the backend SMTP settings and try again.";
+  } else if (status === 500 && req.path.startsWith("/api/admin/products")) {
+    message = "The product could not be saved. Please try again.";
+  } else if (status === 500) {
+    message = "Something went wrong. Please try again.";
+  }
   return res.status(status).json({
-    message: status === 500 ? "The product could not be saved. Please try again." : error.message,
+    message,
   });
 });
 
