@@ -369,7 +369,8 @@ function getCookie(request, name) {
 }
 
 function requireFrontendOrigin(request, response, next) {
-  if (request.get("origin") !== SHOPFRONT_ORIGIN) {
+  const origin = request.get("origin");
+  if (!origin || (!allowedOrigins.has(origin) && !isShopfrontVercelPreviewOrigin(origin))) {
     return response.status(403).json({ message: "Request origin is not allowed." });
   }
   return next();
